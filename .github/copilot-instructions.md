@@ -90,10 +90,12 @@ These selectors are **fragile** and may break if X updates their HTML:
 'div[data-testid="tweetText"]'        // Tweet content
 'div[data-testid="User-Name"]'        // Author info
 'time'                                 // Timestamp
-'img[alt="Image"]'                     // Images
+'div[data-testid="tweetPhoto"] img'   // Images (language-independent)
 'video'                                // Videos
 'div[role="link"]'                     // Quoted tweets
 ```
+
+**⚠️ Important**: Always use `data-testid` attributes when available - they're language-independent and more stable than text-based attributes like `alt="Image"` (which becomes `alt="图片"` in Chinese).
 
 ## Edge Cases Handled
 
@@ -121,6 +123,12 @@ await Promise.all(tweets.map(t => processTweet(t)));
 ### When adding new data extraction:
 
 ```typescript
+// ✅ GOOD: Use data-testid (language-independent)
+const photos = await mainTweet.$$('div[data-testid="tweetPhoto"] img');
+
+// ❌ BAD: Text-based attributes depend on language
+const photos = await mainTweet.$$('img[alt="Image"]'); // Breaks in Chinese (alt="图片")
+
 // ✅ GOOD: Null-safe with fallback
 const author = await element?.$('selector')?.innerText() || 'Unknown';
 

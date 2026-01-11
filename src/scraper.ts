@@ -125,10 +125,11 @@ async function extractFullTweetContent(page: Page, tweetUrl: string, tweetId: st
 
         const mediaUrls: string[] = [];
         
-        const images = await mainTweet.$$('img[alt="Image"]');
-        for (const img of images) {
+        // Use data-testid to locate image containers, independent of language
+        const photoContainers = await mainTweet.$$('div[data-testid="tweetPhoto"] img');
+        for (const img of photoContainers) {
             const src = await img.getAttribute('src');
-            if (src && !src.includes('profile_images')) {
+            if (src) {
                 mediaUrls.push(src);
             }
         }
