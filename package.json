@@ -6,7 +6,8 @@
     "scripts": {
         "start": "bun run src/index.ts",
         "scrape": "bun run src/index.ts scrape",
-        "auth": "bun run src/index.ts auth"
+        "auth": "bun run src/index.ts auth",
+        "stats": "bun run src/index.ts stats"
     },
     "devDependencies": {
         "@types/node": "^25.0.6",

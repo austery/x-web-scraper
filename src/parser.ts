@@ -48,7 +48,7 @@ ${tweet.mediaUrls.map(url => `![](${url})`).join('\n\n')}
     return frontMatter;
 }
 
-export function saveBookmark(tweet: TweetData, outputDir: string) {
+export function saveBookmark(tweet: TweetData, outputDir: string): string {
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -61,4 +61,6 @@ export function saveBookmark(tweet: TweetData, outputDir: string) {
     const content = formatMarkdown(tweet);
     fs.writeFileSync(filePath, content);
     console.log(`Saved: ${filename}`);
+    
+    return filePath;
 }

@@ -4,3 +4,4 @@ dist
 output
 storageState.json
 .env
+pipeline.db

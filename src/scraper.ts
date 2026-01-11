@@ -1,5 +1,6 @@
 import { getAuthenticatedContext } from './auth';
 import { saveBookmark, type TweetData } from './parser';
+import { isTweetScraped, markAsScraped, getTotalScrapedCount } from './db';
 import path from 'path';
 import type { Page } from 'playwright';
 
@@ -37,6 +38,7 @@ async function collectTweetUrls(page: Page, maxTweets: number = 10): Promise<Twe
     const collectedUrls = new Map<string, TweetUrlData>();
     let scrollAttempts = 0;
     const MAX_SCROLL_ATTEMPTS = 30;
+    let newTweetsCount = 0;
 
     while (collectedUrls.size < maxTweets && scrollAttempts < MAX_SCROLL_ATTEMPTS) {
         const tweets = await page.$$('article[data-testid="tweet"]');
@@ -59,11 +61,18 @@ async function collectTweetUrls(page: Page, maxTweets: number = 10): Promise<Twe
 
                 if (id && !collectedUrls.has(id)) {
                     collectedUrls.set(id, { id, url });
+                    newTweetsCount++;
                     console.log(`  ✓ Collected: ${url}`);
                 }
             } catch (err) {
                 continue;
             }
+        }
+
+        // If we haven't found new tweets in a while, we might have reached the end
+        if (newTweetsCount === 0 && scrollAttempts > 5) {
+            console.log('  ℹ️  No new tweets found, stopping collection');
+            break;
         }
 
         await page.evaluate(() => window.scrollBy(0, 1000));
@@ -176,7 +185,11 @@ export async function scrapeBookmarks(maxTweets: number = 10) {
             return;
         }
         
-        console.log('✅ Authentication verified\n');
+        console.log('✅ Authentication verified');
+        
+        // Show current database stats
+        const totalScraped = getTotalScrapedCount();
+        console.log(`📊 Database: ${totalScraped} tweets already scraped\n`);
 
         const tweetUrls = await collectTweetUrls(page, maxTweets);
         
@@ -188,17 +201,37 @@ export async function scrapeBookmarks(maxTweets: number = 10) {
         console.log('📝 Phase 2: Extracting full tweet content...');
         const outputDir = path.join(process.cwd(), 'output');
         let successCount = 0;
+        let skippedCount = 0;
 
         for (let i = 0; i < tweetUrls.length; i++) {
             const { id, url } = tweetUrls[i];
+
+            // 🛑 Critical check: Skip if already scraped
+            if (isTweetScraped(id)) {
+                console.log(`\n[${i + 1}/${tweetUrls.length}] ⏭️  Skipping (Already scraped): ${id}`);
+                skippedCount++;
+                continue;
+            }
+
             console.log(`\n[${i + 1}/${tweetUrls.length}] Processing: ${url}`);
 
             const tweetData = await extractFullTweetContent(page, url, id);
 
             if (tweetData) {
-                saveBookmark(tweetData, outputDir);
+                const savedPath = saveBookmark(tweetData, outputDir);
+                
+                // ✅ Record in database after successful scrape
+                markAsScraped(
+                    id, 
+                    url, 
+                    tweetData.authorHandle,
+                    tweetData.authorName,
+                    savedPath,
+                    tweetData.mediaUrls.length
+                );
+                
                 successCount++;
-                console.log(`  ✅ Saved successfully`);
+                console.log(`  ✅ Saved & Recorded in DB`);
             } else {
                 console.log(`  ⚠️  Skipped due to extraction error`);
             }
@@ -210,7 +243,9 @@ export async function scrapeBookmarks(maxTweets: number = 10) {
             }
         }
 
-        console.log(`\n✨ Done! Successfully scraped ${successCount}/${tweetUrls.length} bookmarks.`);
+        const newTotal = getTotalScrapedCount();
+        console.log(`\n✨ Done! Successfully scraped ${successCount} new tweets (${skippedCount} already existed).`);
+        console.log(`📊 Total in database: ${newTotal} tweets`);
 
     } catch (e) {
         console.error('❌ Error during scraping:', e);
